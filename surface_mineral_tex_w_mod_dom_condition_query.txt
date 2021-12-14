@@ -1,0 +1,101 @@
+-- This query determines the dominant condition surface texture (chtexturegrp table) for 
+--the first mineral horizon by mapunit.  Texture modifiers such as gravelly or cobbly are included.
+-- Submit this query to:
+-- https://sdmdataaccess.nrcs.usda.gov/Query.aspx
+
+--Subquery 1 -  this  query finds all horizons that have an RV texture that is not an unsaturated organic 
+--horizon that contains OPM, SPM, MPM, or HPM by cokey.
+
+SELECT legend.areasymbol, mapunit.musym, mapunit.mukey, component.cokey, component.comppct_r, chorizon.hzdept_r , chtexturegrp.texdesc
+
+INTO #table1
+
+FROM legend
+INNER JOIN mapunit on legend.lkey = mapunit.lkey
+INNER JOIN component ON mapunit.mukey = component.mukey
+INNER JOIN chorizon ON component.cokey = chorizon.cokey
+INNER JOIN chtexturegrp on chorizon.chkey = chtexturegrp.chkey
+
+WHERE legend.areasymbol Like 'UT%' 
+AND
+component.majcompflag = 'yes' AND
+
+chtexturegrp.texdesc = (select TOP 1 chtexturegrp.texdesc FROM chtexturegrp WHERE chtexturegrp.texture Not Like '%SPM%' AND chtexturegrp.texture Not Like '%MPM%' AND chtexturegrp.texture Not Like '%HPM%' AND chtexturegrp.texture Not Like '%OPM%' AND chorizon.chkey = chtexturegrp.chkey AND chorizon.cokey = component.cokey ORDER BY chorizon.hzdept_r, chtexturegrp.rvindicator DESC)
+
+GROUP BY legend.areasymbol, mapunit.musym, mapunit.mukey, component.cokey, component.comppct_r, chorizon.hzdept_r , chtexturegrp.texture, chtexturegrp.texdesc, chorizon.chkey, chorizon.cokey, chtexturegrp.rvindicator
+
+ORDER BY legend.areasymbol, mapunit.musym, mapunit.mukey, component.cokey, chorizon.hzdept_r
+
+-----------------------------------------
+--Subquery 2 – this query finds the minimum horizon to mineral horizon depth by cokey from subquery 1
+
+SELECT #table1.mukey, #table1.cokey, MIN(#table1.hzdept_r) AS top_depth
+
+INTO #table2 
+FROM #table1
+
+GROUP BY #table1.mukey, #table1.cokey
+
+ORDER BY #table1.mukey, #table1.cokey
+
+-------------------------------------------
+-- Subquery 3 – Find texture of first mineral horizon by cokey
+
+SELECT #table2.mukey, #table2.cokey, #table2.top_depth, #table1.texdesc AS comp_surftex, #table1.comppct_r
+
+INTO #table3
+FROM #table2
+INNER JOIN #table1 on #table2.mukey = #table1.mukey
+AND #table1.cokey = #table2.cokey
+AND #table1. hzdept_r = #table2.top_depth
+
+ORDER BY #table2.mukey, #table2.cokey, #table1.comppct_r DESC
+----------------------------------------------------
+
+-- Subquery 4 (1)  – sum component percentages for each texture by mukey (TABLE 4)
+
+SELECT #table3.mukey,  #table3.comp_surftex, SUM(#table3.comppct_r) AS mutex_comppct
+
+INTO #table4
+FROM #table3
+
+GROUP BY #table3.mukey, #table3.comp_surftex
+
+ORDER BY #table3.mukey
+-------------------------------------------------------------------
+-- Subquery 5 (2) – determine the maximum mutex_comppct by mukey (TABLE 5)
+
+SELECT #table4.mukey, MAX(#table4.mutex_comppct) AS max_mutex_pct
+
+INTO #table5
+FROM #table4
+
+GROUP BY #table4.mukey
+
+ORDER BY #table4.mukey
+
+---------------------------------------------------------------
+-- Subquery 6 – determine the dominant condition surface texture by mukey (TABLE 6)
+
+SELECT DISTINCT #table4.mukey, #table4.comp_surftex AS mu_dcd_surftex
+
+INTO #table6
+FROM #table5
+
+INNER JOIN #table4 on #table4.mukey = #table5.mukey
+AND #table5.max_mutex_pct = #table4. mutex_comppct
+
+ORDER by #table4.mukey
+------------------------------------------------------------------------
+
+-- Final query – outer join to include all mapunits and bring in legend information
+
+SELECT legend.areasymbol, legend.areaname, mapunit.musym, mapunit.muname, mapunit.mukey,  LOWER(#table6. mu_dcd_surftex) AS mu_dcd_surftexgrp
+
+FROM legend
+INNER JOIN mapunit on mapunit.lkey = legend.lkey
+LEFT OUTER JOIN #table6 on mapunit.mukey = #table6.mukey
+
+WHERE legend.areasymbol Like 'UT%'
+
+ORDER by legend.areasymbol, legend.areaname, mapunit.musym, mapunit.muname, mapunit.mukey
