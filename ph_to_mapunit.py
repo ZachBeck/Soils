@@ -1,3 +1,7 @@
+
+# Function no longer needed since schema won't hold pH values
+# from ph_to_mapunit import get_pH
+
 import arcpy
 
 def get_pH(ugrc_soils):

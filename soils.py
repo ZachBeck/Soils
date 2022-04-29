@@ -1,8 +1,10 @@
 import arcpy
 import pandas as pd
 import os
-
+'''
+No longer needed since schema won't hold pH values
 from ph_to_mapunit import get_pH
+'''
 
 def remove_null(word):
     if word == None:
@@ -15,19 +17,26 @@ mapunit_tbl = os.path.join(ssurgo_db, 'mapunit')
 muaggatt_tbl = os.path.join(ssurgo_db, 'muaggatt')
 coecoclass_tbl = os.path.join(ssurgo_db, 'coecoclass')
 
-ugrc_soils_fc = r'C:\ZBECK\SGID\Soils\soils_working.gdb\ugrc_soils'
+ugrc_soils_fc = r'C:\ZBECK\SGID\Soils\Soils.gdb\Soils'
+# ugrc_soils_flds = ['mukey', 'areasymbol', 'areaname', 'musymbol', 'muname', 'musurftexgrp', 
+#                    'hydgrpdcd', 'engdwbml', 'aws025wta', 'aws050wta', 'aws0100wta',
+#                    'aws0150wta', 'hydclprs', 'farmlndcl', 'wtdepannmin', 'wtdepaprjunmin',
+#                    'top_ph1to1h2o_r', 'SHAPE@']
 ugrc_soils_flds = ['mukey', 'areasymbol', 'areaname', 'musymbol', 'muname', 'musurftexgrp', 
                    'hydgrpdcd', 'engdwbml', 'aws025wta', 'aws050wta', 'aws0100wta',
                    'aws0150wta', 'hydclprs', 'farmlndcl', 'wtdepannmin', 'wtdepaprjunmin',
-                   'top_ph1to1h2o_r', 'SHAPE@']
-
+                   'SHAPE@']
+                   
 nrcs_query_results = r'C:\ZBECK\SGID\Soils\SoilsQueryResults.csv'
 nrcs_query_df = pd.read_csv(nrcs_query_results)
 nrcs_query_dict = nrcs_query_df.set_index('mukey').T.to_dict('list')
-'''nrcs dictionary structure
-   nrcs_query_dict = {mukey: ['areasymbol', 'areaname', 'musym', 'muname', 'mu_dcd_surftexgrp', 'muname',
-                              'farmlndcl', 'hydgrpdcd', 'engdwbml', 'aws025wta', 'aws050wta', 'aws0100wta',
-                              'aws0150wta', 'hydclprs', 'wtdepannmin', 'wtdepaprjunmin']}  '''
+
+'''
+nrcs dictionary structure
+nrcs_query_dict = {mukey: ['areasymbol', 'areaname', 'musym', 'muname', 'mu_dcd_surftexgrp', 'muname',
+                           'farmlndcl', 'hydgrpdcd', 'engdwbml', 'aws025wta', 'aws050wta', 'aws0100wta',
+                           'aws0150wta', 'hydclprs', 'wtdepannmin', 'wtdepaprjunmin']}
+'''
 
 mupoly_flds = ['MUKEY', 'AREASYMBOL', 'MUSYM', 'SHAPE@']
 mapunit_flds = ['mukey', 'muname', 'farmlndcl']
@@ -57,9 +66,10 @@ with arcpy.da.SearchCursor(mupoly_fc, mupoly_flds) as scursor, \
         areasymbol = row[1]
         musymbol = row[2]
         shp = row[3]
-
+        # icursor.insertRow((mukey, areasymbol, '', musymbol, '', '', '', '', None,
+        #                    None, None, None, '', '', None, None, None, shp))
         icursor.insertRow((mukey, areasymbol, '', musymbol, '', '', '', '', None,
-                           None, None, None, '', '', None, None, None, shp))
+                           None, None, None, '', '', None, None, shp))
 
 with arcpy.da.UpdateCursor(ugrc_soils_fc, ugrc_soils_flds) as ucursor:
     for row in ucursor:
@@ -81,14 +91,15 @@ with arcpy.da.UpdateCursor(ugrc_soils_fc, ugrc_soils_flds) as ucursor:
 
         ucursor.updateRow(row)
 
+'''
+No longer needed since schema doesn't hold pH values
 mapunit_ph = get_pH(ugrc_soils_fc)
-
 with arcpy.da.UpdateCursor(ugrc_soils_fc, ugrc_soils_flds) as ucursor:
     for row in ucursor:
         if row[0] in mapunit_ph:
             if mapunit_ph[row[0]] == []:
                 row[16] = None
             else:
-                row[16] = mapunit_ph[row[0]][0]
-                
+                row[16] = mapunit_ph[row[0]][0]              
         ucursor.updateRow(row)
+'''
